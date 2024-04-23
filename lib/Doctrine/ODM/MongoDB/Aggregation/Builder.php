@@ -58,6 +58,13 @@ class Builder
     private bool $rewindable = true;
 
     /**
+     * Array of primer Closure instances.
+     *
+     * @var array<string, true|callable>
+     */
+    private array $primers = [];
+
+    /**
      * Create a new aggregation builder.
      *
      * @psalm-param class-string $documentName
@@ -251,7 +258,7 @@ class Builder
     {
         $class = $this->hydrationClass ? $this->dm->getClassMetadata($this->hydrationClass) : null;
 
-        return new Aggregation($this->dm, $class, $this->collection, $this->getPipeline(), $options, $this->rewindable);
+        return new Aggregation($this->dm, $class, $this->collection, $this->getPipeline(), $options, $this->rewindable, $this->primers);
     }
 
     // phpcs:disable Squiz.Commenting.FunctionComment.ExtraParamComment
@@ -454,6 +461,31 @@ class Builder
         $stage = new Stage\Out($this, $from, $this->dm);
 
         return $this->addStage($stage);
+    }
+
+    /**
+     * Use a primer to eagerly load all references in the current field.
+     *
+     * If $primer is true or a callable is provided, referenced documents for
+     * this field will loaded into UnitOfWork immediately after the query is
+     * executed. This will avoid multiple queries due to lazy initialization of
+     * Proxy objects.
+     *
+     * If $primer is false, no priming will take place. That is also the default
+     * behavior.
+     *
+     * If a custom callable is used, its signature should conform to the default
+     * Closure defined in {@link ReferencePrimer::__construct()}.
+     *
+     * @param bool|callable $primer
+     *
+     * @throws InvalidArgumentException If $primer is not boolean or callable.
+     */
+    public function prime(string $field): self
+    {
+        $this->primers[$field] = true;
+
+        return $this;
     }
 
     /**
