@@ -581,4 +581,40 @@ class ReferencePrimerTest extends BaseTestCase
         self::assertInstanceOf(GhostObjectInterface::class, $comment->author);
         self::assertFalse($this->uow->isUninitializedObject($comment->author));
     }
+
+    public function testPrimeReferencesWithDBRefObjectsFromAggregation(): void
+    {
+        $user = new User();
+        $user->addGroup(new Group());
+        $user->addGroup(new Group());
+        $user->setAccount(new Account());
+
+        $this->dm->persist($user);
+        $this->dm->flush();
+        $this->dm->clear();
+
+        $builder = $this->dm->createAggregationBuilder(User::class);
+        $builder->match()
+            ->field('id')
+            ->exists(true);
+        $builder
+            ->hydrate(User::class)
+            ->prime('account')
+            ->prime('groups');
+
+        foreach ($builder->getAggregation() as $user) {
+            self::assertInstanceOf(GhostObjectInterface::class, $user->getAccount());
+            self::assertFalse($this->uow->isUninitializedObject($user->getAccount()));
+
+            self::assertCount(2, $user->getGroups());
+
+            /* Since the Groups are primed before the PersistentCollection is
+             * initialized, they will not be hydrated as proxy objects.
+             */
+            foreach ($user->getGroups() as $group) {
+                self::assertNotInstanceOf(GhostObjectInterface::class, $group);
+                self::assertInstanceOf(Group::class, $group);
+            }
+        }
+    }
 }

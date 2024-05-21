@@ -58,13 +58,13 @@ final class Aggregation implements IteratorAggregate
             $cursor = new HydratingIterator($cursor, $this->dm->getUnitOfWork(), $this->classMetadata);
         }
 
+        $cursor = $this->rewindable ? new CachingIterator($cursor) : new UnrewindableIterator($cursor);
+
         if (! empty($this->primers)) {
             $referencePrimer = new ReferencePrimer($this->dm, $this->dm->getUnitOfWork());
             $cursor          = new PrimingIterator($cursor, $this->classMetadata, $referencePrimer, $this->primers, []);
         }
 
-
-
-        return $this->rewindable ? new CachingIterator($cursor) : new UnrewindableIterator($cursor);
+        return $cursor;
     }
 }
